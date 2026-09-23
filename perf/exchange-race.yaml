@@ -1,0 +1,28 @@
+config:
+  environments:
+    api:
+      target: 'http://localhost:5555'
+      plugins:
+        statsd:
+          host: localhost
+          port: 8125
+          prefix: "artillery-api"
+
+  pool: 50 # All HTTP requests from all virtual users will be sent over the same connections
+
+  phases:
+    - name: 50 request en el mismo segundo
+      duration: 1
+      arrivalRate: 50
+
+scenarios:
+  - name: Exchange race condition (same internal counter account)
+    flow:
+      - post:
+          url: '/exchange'
+          json:
+            baseCurrency: 'ARS'
+            counterCurrency: 'EUR'
+            baseAccountId: 2003
+            counterAccountId: 2001
+            baseAmount: 10000000
