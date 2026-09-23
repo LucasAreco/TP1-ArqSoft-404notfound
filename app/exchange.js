@@ -47,23 +47,6 @@ export function setRate(rateRequest) {
   rates[counterCurrency][baseCurrency] = Number((1 / rate).toFixed(5));
 }
 
-// per-account queue of pending critical sections, to serialize check-then-act
-// on the same internal account and avoid the TOC-TOU race condition
-const accountLocks = new Map();
-
-// runs fn() only after every previously queued fn() for this accountId has settled
-function withAccountLock(accountId, fn) {
-  const previous = accountLocks.get(accountId) ?? Promise.resolve();
-  const result = previous.then(fn, fn);
-
-  accountLocks.set(
-    accountId,
-    result.catch(() => {})
-  );
-
-  return result;
-}
-
 //executes an exchange operation
 export async function exchange(exchangeRequest) {
   const {
@@ -94,36 +77,35 @@ export async function exchange(exchangeRequest) {
     obs: null,
   };
 
-  //serialize check-then-act on the counter account: only one exchange at a time
-  //may check its balance and debit it, closing the TOC-TOU race window
-  await withAccountLock(counterAccount.id, async () => {
-    //check if we have funds on the counter currency account
-    if (counterAccount.balance >= counterAmount) {
+  //check if we have funds on the counter currency account
+  if (counterAccount.balance >= counterAmount) {
+    counterAccount.balance -= counterAmount;
+
+    try {
       //try to transfer from clients' base account
-      if (await transfer(clientBaseAccountId, baseAccount.id, baseAmount)) {
-        //try to transfer to clients' counter account
-        if (
-          await transfer(counterAccount.id, clientCounterAccountId, counterAmount)
-        ) {
-          //all good, update balances
-          baseAccount.balance += baseAmount;
-          counterAccount.balance -= counterAmount;
-          exchangeResult.ok = true;
-          exchangeResult.counterAmount = counterAmount;
-        } else {
-          //could not transfer to clients' counter account, return base amount to client
-          await transfer(baseAccount.id, clientBaseAccountId, baseAmount);
-          exchangeResult.obs = "Could not transfer to clients' account";
-        }
-      } else {
-        //could not withdraw from clients' account
-        exchangeResult.obs = "Could not withdraw from clients' account";
+      if (!(await transfer(clientBaseAccountId, baseAccount.id, baseAmount))) {
+        throw new Error("Could not withdraw from clients' account");
       }
-    } else {
-      //not enough funds on internal counter account
-      exchangeResult.obs = "Not enough funds on counter currency account";
+
+      //try to transfer to clients' counter account
+      if (
+        !(await transfer(counterAccount.id, clientCounterAccountId, counterAmount))
+      ) {
+        throw new Error("Could not transfer to clients' account");
+      }
+
+      //all good, update balances
+      baseAccount.balance += baseAmount;
+      exchangeResult.ok = true;
+      exchangeResult.counterAmount = counterAmount;
+    } catch (err) {
+      counterAccount.balance += counterAmount;
+      exchangeResult.obs = err.message;
     }
-  });
+  } else {
+    //not enough funds on internal counter account
+    exchangeResult.obs = "Not enough funds on counter currency account";
+  }
 
   //log the transaction and return it
   log.push(exchangeResult);
