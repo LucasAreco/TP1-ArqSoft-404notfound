@@ -1,50 +1,37 @@
 import { nanoid } from "nanoid";
 
-import { init as stateInit, getAccounts as stateAccounts, getRates as stateRates, getLog as stateLog } from "./state.js";
-
-let accounts;
-let rates;
-let log;
+import * as state from "./state.js";
 
 //call to initialize the exchange service
 export async function init() {
-  await stateInit();
-
-  accounts = stateAccounts();
-  rates = stateRates();
-  log = stateLog();
+  await state.init();
 }
 
 //returns all internal accounts
-export function getAccounts() {
-  return accounts;
+export async function getAccounts() {
+  return state.getAccounts();
 }
 
 //sets balance for an account
-export function setAccountBalance(accountId, balance) {
-  const account = findAccountById(accountId);
-
-  if (account != null) {
-    account.balance = balance;
-  }
+export async function setAccountBalance(accountId, balance) {
+  await state.setAccountBalance(accountId, balance);
 }
 
 //returns all current exchange rates
-export function getRates() {
-  return rates;
+export async function getRates() {
+  return state.getRates();
 }
 
 //returns the whole transaction log
-export function getLog() {
-  return log;
+export async function getLog() {
+  return state.getLog();
 }
 
 //sets the exchange rate for a given pair of currencies, and the reciprocal rate as well
-export function setRate(rateRequest) {
+export async function setRate(rateRequest) {
   const { baseCurrency, counterCurrency, rate } = rateRequest;
 
-  rates[baseCurrency][counterCurrency] = rate;
-  rates[counterCurrency][baseCurrency] = Number((1 / rate).toFixed(5));
+  await state.setRate(baseCurrency, counterCurrency, rate);
 }
 
 //executes an exchange operation
@@ -58,13 +45,13 @@ export async function exchange(exchangeRequest) {
   } = exchangeRequest;
 
   //get the exchange rate
-  const exchangeRate = rates[baseCurrency][counterCurrency];
+  const exchangeRate = await state.getRate(baseCurrency, counterCurrency);
   //compute the requested (counter) amount
   const counterAmount = baseAmount * exchangeRate;
   //find our account on the provided (base) currency
-  const baseAccount = findAccountByCurrency(baseCurrency);
+  const baseAccount = await state.getAccountByCurrency(baseCurrency);
   //find our account on the counter currency
-  const counterAccount = findAccountByCurrency(counterCurrency);
+  const counterAccount = await state.getAccountByCurrency(counterCurrency);
 
   //construct the result object with defaults
   const exchangeResult = {
@@ -86,8 +73,8 @@ export async function exchange(exchangeRequest) {
         await transfer(counterAccount.id, clientCounterAccountId, counterAmount)
       ) {
         //all good, update balances
-        baseAccount.balance += baseAmount;
-        counterAccount.balance -= counterAmount;
+        await state.incrementAccountBalance(baseAccount.id, baseAmount);
+        await state.incrementAccountBalance(counterAccount.id, -counterAmount);
         exchangeResult.ok = true;
         exchangeResult.counterAmount = counterAmount;
       } else {
@@ -105,7 +92,7 @@ export async function exchange(exchangeRequest) {
   }
 
   //log the transaction and return it
-  log.push(exchangeResult);
+  await state.appendLog(exchangeResult);
 
   return exchangeResult;
 }
@@ -117,24 +104,4 @@ async function transfer(fromAccountId, toAccountId, amount) {
   return new Promise((resolve) =>
     setTimeout(() => resolve(true), Math.random() * (max - min + 1) + min)
   );
-}
-
-function findAccountByCurrency(currency) {
-  for (let account of accounts) {
-    if (account.currency == currency) {
-      return account;
-    }
-  }
-
-  return null;
-}
-
-function findAccountById(id) {
-  for (let account of accounts) {
-    if (account.id == id) {
-      return account;
-    }
-  }
-
-  return null;
 }

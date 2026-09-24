@@ -1,68 +1,139 @@
 import { fileURLToPath } from "url";
 import path from "path";
 import fs from "fs";
-
-let accounts = null;
-let rates = null;
-let log = null;
+import { createClient } from "redis";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const ACCOUNTS = "./state/accounts.json";
-const RATES = "./state/rates.json";
-const LOG = "./state/log.json";
+const SEED_ACCOUNTS = "./state/accounts.json";
+const SEED_RATES = "./state/rates.json";
+
+const ACCOUNT_IDS_KEY = "accounts:ids";
+const RATE_CURRENCIES_KEY = "rates:currencies";
+const LOG_KEY = "log";
+
+const redisUrl = process.env.REDIS_URL || "redis://redis:6379";
+const client = createClient({ url: redisUrl });
+client.on("error", (err) => console.error("Redis Client Error", err));
 
 export async function init() {
-  accounts = await load(ACCOUNTS);
-  rates = await load(RATES);
-  log = await load(LOG);
-
-  scheduleSave(accounts, ACCOUNTS, 1000);
-  scheduleSave(rates, RATES, 5000);
-  scheduleSave(log, LOG, 1000);
+  await client.connect();
+  await seedIfEmpty();
 }
 
-export function getAccounts() {
-  return accounts;
-}
+async function seedIfEmpty() {
+  const hasAccounts = await client.exists(ACCOUNT_IDS_KEY);
+  if (!hasAccounts) {
+    const seedAccounts = await loadSeed(SEED_ACCOUNTS);
+    for (const account of seedAccounts) {
+      await client.hSet(`account:${account.id}`, {
+        currency: account.currency,
+        balance: account.balance,
+      });
+      await client.sAdd(ACCOUNT_IDS_KEY, String(account.id));
+    }
+  }
 
-export function getRates() {
-  return rates;
-}
-
-export function getLog() {
-  return log;
-}
-
-async function load(fileName) {
-  const filePath = path.join(__dirname, fileName);
-
-  try {
-    await fs.promises.access(filePath);
-    const raw = await fs.promises.readFile(filePath, "utf8");
-    
-    return JSON.parse(raw);
-  } catch (err) {
-    if (err.code == "ENOENT") {
-      console.error(`${filePath} not found`);
-    } else {
-      console.error(`Error loading ${filePath}:`, err);
+  const hasRates = await client.exists(RATE_CURRENCIES_KEY);
+  if (!hasRates) {
+    const seedRates = await loadSeed(SEED_RATES);
+    for (const [baseCurrency, counterRates] of Object.entries(seedRates)) {
+      await client.hSet(`rates:${baseCurrency}`, counterRates);
+      await client.sAdd(RATE_CURRENCIES_KEY, baseCurrency);
     }
   }
 }
 
-async function save(data, fileName) {
+async function loadSeed(fileName) {
   const filePath = path.join(__dirname, fileName);
-  try {
-    await fs.promises.writeFile(filePath, JSON.stringify(data, null, 2));
-  } catch (err) {
-    console.error(`Error writing to ${filePath}:`, err);
-  }
+  const raw = await fs.promises.readFile(filePath, "utf8");
+  return JSON.parse(raw);
 }
 
-function scheduleSave(data, fileName, period) {
-  setInterval(async () => {
-    await save(data, fileName);
-  }, period);
+// ACCOUNTS
+
+export async function getAccounts() {
+  const ids = await client.sMembers(ACCOUNT_IDS_KEY);
+  const accounts = [];
+
+  for (const id of ids) {
+    const account = await hydrateAccount(id);
+    if (account != null) {
+      accounts.push(account);
+    }
+  }
+
+  return accounts;
+}
+
+export async function getAccountById(id) {
+  return hydrateAccount(id);
+}
+
+export async function getAccountByCurrency(currency) {
+  const accounts = await getAccounts();
+  return accounts.find((account) => account.currency === currency) ?? null;
+}
+
+export async function setAccountBalance(id, balance) {
+  await client.hSet(`account:${id}`, { balance });
+}
+
+export async function incrementAccountBalance(id, delta) {
+  await client.hIncrByFloat(`account:${id}`, "balance", delta);
+}
+
+async function hydrateAccount(id) {
+  const data = await client.hGetAll(`account:${id}`);
+
+  if (Object.keys(data).length === 0) {
+    return null;
+  }
+
+  return {
+    id: Number(id),
+    currency: data.currency,
+    balance: Number(data.balance),
+  };
+}
+
+// RATES
+
+export async function getRates() {
+  const bases = await client.sMembers(RATE_CURRENCIES_KEY);
+  const rates = {};
+
+  for (const base of bases) {
+    const counterRates = await client.hGetAll(`rates:${base}`);
+    rates[base] = Object.fromEntries(
+      Object.entries(counterRates).map(([currency, rate]) => [currency, Number(rate)])
+    );
+  }
+
+  return rates;
+}
+
+export async function getRate(baseCurrency, counterCurrency) {
+  const rate = await client.hGet(`rates:${baseCurrency}`, counterCurrency);
+  return rate == null ? null : Number(rate);
+}
+
+export async function setRate(baseCurrency, counterCurrency, rate) {
+  const reciprocal = Number((1 / rate).toFixed(5));
+
+  await client.hSet(`rates:${baseCurrency}`, { [counterCurrency]: rate });
+  await client.hSet(`rates:${counterCurrency}`, { [baseCurrency]: reciprocal });
+  await client.sAdd(RATE_CURRENCIES_KEY, [baseCurrency, counterCurrency]);
+}
+
+// LOG
+
+export async function getLog() {
+  const entries = await client.lRange(LOG_KEY, 0, -1);
+  return entries.map((entry) => JSON.parse(entry));
+}
+
+export async function appendLog(entry) {
+  await client.rPush(LOG_KEY, JSON.stringify(entry));
 }

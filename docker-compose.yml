@@ -1,6 +1,15 @@
 services:
     api:
       build: ./app
+      depends_on:
+            - redis
+      environment:
+            - REDIS_URL=redis://redis:6379
+
+    redis:
+        image: redis:7
+        volumes:
+            - redis_data:/data
 
     nginx:
         image: nginx:1.29.8
@@ -44,4 +53,6 @@ services:
 
 volumes:
     grafana_config:
+        driver: local
+    redis_data:
         driver: local
