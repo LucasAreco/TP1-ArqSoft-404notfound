@@ -1,0 +1,19 @@
+config:
+  target: 'http://localhost:5555'
+  plugins:
+    statsd:
+      host: localhost
+      port: 8125
+      prefix: "artillery-api"
+
+  pool: 1000
+
+  phases:
+    - duration: 30
+      arrivalRate: 10
+
+scenarios:
+  - name: Read log (populated)
+    flow:
+      - get:
+          url: '/log'

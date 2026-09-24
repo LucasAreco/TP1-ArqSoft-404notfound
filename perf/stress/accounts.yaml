@@ -1,0 +1,32 @@
+config:
+  environments:
+    api:
+      target: 'http://localhost:5555'
+      plugins:
+        statsd:
+          host: localhost
+          port: 8125
+          prefix: "artillery-api"
+
+  pool: 3000 # All HTTP requests from all virtual users will be sent over the same connections
+
+  phases:
+    - name: Warm up
+      duration: 15
+      arrivalRate: 5
+    - name: Ramp to breaking point
+      duration: 180
+      arrivalRate: 30
+      rampTo: 700
+    - name: Peak sustain
+      duration: 30
+      arrivalRate: 700
+
+
+scenarios:
+  - name: Accounts Stress (/accounts)
+    flow:
+      - get:
+          url: '/accounts'
+
+

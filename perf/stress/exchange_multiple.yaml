@@ -1,0 +1,44 @@
+config:
+  environments:
+    api:
+      target: 'http://localhost:5555'
+      plugins:
+        statsd:
+          host: localhost
+          port: 8125
+          prefix: "artillery-api"
+
+  pool: 3000 # All HTTP requests from all virtual users will be sent over the same connections
+
+  variables:
+    pair:
+      - {from: "USD", to: "ARS"}
+      - {from: "ARS", to: "USD"}
+      - {from: "EUR", to: "ARS"}
+      - {from: "BRL", to: "ARS"}
+      - {from: "ARS", to: "BRL"}
+      - {from: "ARS", to: "EUR"}
+
+  phases:
+    - name: Warm up
+      duration: 15
+      arrivalRate: 5
+    - name: Ramp to breaking point
+      duration: 180
+      arrivalRate: 30
+      rampTo: 300
+    - name: Peak sustain
+      duration: 180
+      arrivalRate: 300
+
+scenarios:
+  - name: Exchange
+    flow:
+      - post:
+          url: '/exchange'
+          json:
+            baseCurrency: "{{ pair.from }}"
+            counterCurrency: "{{ pair.to }}"
+            baseAccountId: "1"
+            counterAccountId: "2"
+            baseAmount: 1

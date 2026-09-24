@@ -8,22 +8,22 @@ config:
           port: 8125
           prefix: "artillery-api"
 
-  pool: 100
+  pool: 3000 # All HTTP requests from all virtual users will be sent over the same connections
 
   phases:
-    - name: WarmUp
-      duration: 10
-      arrivalRate: 1
-    - name: RampaNormal
-      duration: 90
-      arrivalRate: 2
-      rampTo: 15
-    - name: SostenidoNormal
-      duration: 60
-      arrivalRate: 15
+    - name: Warm up
+      duration: 15
+      arrivalRate: 5
+    - name: Ramp to breaking point
+      duration: 180
+      arrivalRate: 30
+      rampTo: 300
+    - name: Peak sustain
+      duration: 180
+      arrivalRate: 300
 
 scenarios:
-  - name: Exchange (normal)
+  - name: Exchange
     flow:
       - post:
           url: '/exchange'
@@ -32,4 +32,4 @@ scenarios:
             counterCurrency: "ARS"
             baseAccountId: "1"
             counterAccountId: "2"
-            baseAmount: 10
+            baseAmount: 1
