@@ -66,4 +66,5 @@ function sendMetricsPeriodically(){
         sendMetrics(currency, metrics);
     }
 }
-const interval = setInterval(sendMetricsPeriodically, 5000);
+
+const interval = setInterval(sendMetricsPeriodically, 3000);
