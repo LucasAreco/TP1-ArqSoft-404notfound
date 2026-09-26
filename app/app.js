@@ -1,4 +1,5 @@
 import express from "express";
+import { addBuyingMovement, addSellingMovement } from "./metrica.js";
 
 import {
   init as exchangeInit,
@@ -86,6 +87,9 @@ app.post("/exchange", async (req, res) => {
   const exchangeResult = await exchange(exchangeRequest);
 
   if (exchangeResult.ok) {
+    addSellingMovement(baseCurrency, baseAmount);
+    addBuyingMovement(counterCurrency, baseAmount * exchangeResult.exchangeRate);
+  
     res.status(200).json(exchangeResult);
   } else {
     res.status(500).json(exchangeResult);
