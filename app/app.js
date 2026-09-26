@@ -1,4 +1,5 @@
 import express from "express";
+import { addBuyingMovement, addSellingMovement } from "./metrica.js";
 
 import {
   init as exchangeInit,
@@ -39,6 +40,7 @@ app.put("/accounts/:id/balance", (req, res) => {
 // RATE endpoints
 
 app.get("/rates", (req, res) => {
+  
   res.json(getRates());
 });
 
@@ -48,9 +50,6 @@ app.put("/rates", (req, res) => {
   if (!baseCurrency || !counterCurrency || !rate) {
     return res.status(400).json({ error: "Malformed request" });
   }
-
-  const newRateRequest = { ...req.body };
-  setRate(newRateRequest);
 
   res.json(getRates());
 });
@@ -86,6 +85,9 @@ app.post("/exchange", async (req, res) => {
   const exchangeResult = await exchange(exchangeRequest);
 
   if (exchangeResult.ok) {
+    addSellingMovement(baseCurrency, baseAmount)
+    addBuyingMovement(counterCurrency, baseAmount)
+  
     res.status(200).json(exchangeResult);
   } else {
     res.status(500).json(exchangeResult);
