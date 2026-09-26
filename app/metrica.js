@@ -11,7 +11,24 @@ const currency_metrics = new Map([
     ["BRL", [0, 0]],
     ["EUR", [0, 0]],
     ["USD", [0, 0]],
-])
+]);
+
+function sendAllMetrics() {
+  const metricsArray = [];
+
+  for (const [currency, metrics] of currency_metrics) {
+    metricsArray.push(`currency.${currency}.volume:${metrics[0]}|g`);
+    metricsArray.push(`currency.${currency}.net:${metrics[1]}|g`);
+  }
+
+  const payload = Buffer.from(metricsArray.join('\n'));
+
+  clienteStatsD.send(payload, 0, payload.length, statsd_port, statsd_host, (error) => {
+    if (error) {
+      console.error('Error sending metric:', error.message);
+    }
+  });
+}
 
 // Increases volume and net value
 export function addBuyingMovement(currency, bought_ammount){
@@ -25,7 +42,7 @@ export function addBuyingMovement(currency, bought_ammount){
     metrics[1] += bought_ammount;
     currency_metrics.set(currency, metrics);
 
-    sendMetrics(currency, metrics);
+    sendAllMetrics(currency, metrics);
 }
 
 // Increases volume, but decresses net value
@@ -40,31 +57,8 @@ export function addSellingMovement(currency, sold_ammount){
     metrics[1] -= sold_ammount;
     currency_metrics.set(currency, metrics);
     
-    sendMetrics(currency, metrics);
+    sendAllMetrics();
 }
 
-function sendMetrics(currency, values) {
-
-    // StatsD expected string format:
-    const vol_msg = Buffer.from(`currency.${currency}.volume:${values[0]}|g`);
-    const net_msg = Buffer.from(`currency.${currency}.net:${values[1]}|g`);
-    const msgs = [vol_msg, net_msg];
-
-    for (let i = 0; i < 2; i++){
-        let msg = msgs[i];
-        clienteStatsD.send(msg, 0, msg.length, statsd_port, statsd_host, (error) => {
-            if (error) {
-                console.error(`Error sending metric ${currency}:`, error.msg);
-            }
-        });
-    }
-}
-
-//each 10 seconds the movements are send
-function sendMetricsPeriodically(){
-    for (let [currency, metrics] of currency_metrics){
-        sendMetrics(currency, metrics);
-    }
-}
-
-const interval = setInterval(sendMetricsPeriodically, 3000);
+sendAllMetrics()
+const interval = setInterval(sendAllMetrics, 3000);
