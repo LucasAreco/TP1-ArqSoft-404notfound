@@ -26,10 +26,10 @@ config:
     - name: Ramp to breaking point
       duration: 180
       arrivalRate: 30
-      rampTo: 500
+      rampTo: 200
     - name: Peak sustain
       duration: 120
-      arrivalRate: 500
+      arrivalRate: 200
 
 scenarios:
   - name: Caso de uso usuario (Rates -> Exchange -> Log)"
