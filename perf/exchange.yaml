@@ -1,0 +1,31 @@
+config:
+  environments:
+    api:
+      target: 'http://localhost:5555'
+      plugins:
+        statsd:
+          host: localhost
+          port: 8125
+          prefix: "artillery-api"
+
+  http:
+    timeout: 30
+
+  pool: 50 # All HTTP requests from all virtual users will be sent over the same connections
+
+  phases:
+    - name: Carga sostenida sobre la misma cuenta interna
+      duration: 60
+      arrivalRate: 20
+
+scenarios:
+  - name: Exchange sostenido (misma cuenta interna)
+    flow:
+      - post:
+          url: '/exchange'
+          json:
+            baseCurrency: 'ARS'
+            counterCurrency: 'EUR'
+            baseAccountId: 2018
+            counterAccountId: 2011
+            baseAmount: 100
