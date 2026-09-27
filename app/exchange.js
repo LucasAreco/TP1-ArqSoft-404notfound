@@ -64,26 +64,28 @@ export async function exchange(exchangeRequest) {
     obs: null,
   };
 
-  //check if we have funds on the counter currency account
-  if (counterAccount.balance >= counterAmount) {
+  //atomically check and reserve funds on the counter currency account
+  if (await state.reserveBalance(counterAccount.id, counterAmount)) {
     //try to transfer from clients' base account
     if (await transfer(clientBaseAccountId, baseAccount.id, baseAmount)) {
       //try to transfer to clients' counter account
       if (
         await transfer(counterAccount.id, clientCounterAccountId, counterAmount)
       ) {
-        //all good, update balances
+        //all good, update base balance (counter amount was already reserved)
         await state.incrementAccountBalance(baseAccount.id, baseAmount);
-        await state.incrementAccountBalance(counterAccount.id, -counterAmount);
         exchangeResult.ok = true;
         exchangeResult.counterAmount = counterAmount;
       } else {
         //could not transfer to clients' counter account, return base amount to client
         await transfer(baseAccount.id, clientBaseAccountId, baseAmount);
+        //release the reserved counter amount
+        await state.incrementAccountBalance(counterAccount.id, counterAmount);
         exchangeResult.obs = "Could not transfer to clients' account";
       }
     } else {
-      //could not withdraw from clients' account
+      //could not withdraw from clients' account, release the reserved counter amount
+      await state.incrementAccountBalance(counterAccount.id, counterAmount);
       exchangeResult.obs = "Could not withdraw from clients' account";
     }
   } else {

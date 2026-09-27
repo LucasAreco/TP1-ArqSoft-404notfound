@@ -1,7 +1,7 @@
 import { fileURLToPath } from "url";
 import path from "path";
 import fs from "fs";
-import { createClient } from "redis";
+import { createClient, defineScript } from "redis";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -14,7 +14,34 @@ const RATE_CURRENCIES_KEY = "rates:currencies";
 const LOG_KEY = "log";
 
 const redisUrl = process.env.REDIS_URL || "redis://redis:6379";
-const client = createClient({ url: redisUrl });
+// Atomically checks that the account has enough balance and, if so, deducts it.
+// Returns 1 if the amount was reserved, 0 otherwise.
+const RESERVE_BALANCE_SCRIPT = `
+local balance = tonumber(redis.call("HGET", KEYS[1], "balance"))
+local amount = tonumber(ARGV[1])
+if balance == nil or balance < amount then
+  return 0
+end
+redis.call("HINCRBYFLOAT", KEYS[1], "balance", -amount)
+return 1
+`;
+
+const client = createClient({
+  url: redisUrl,
+  scripts: {
+    reserveBalance: defineScript({
+      SCRIPT: RESERVE_BALANCE_SCRIPT,
+      NUMBER_OF_KEYS: 1,
+      parseCommand(parser, key, amount) {
+        parser.pushKey(key);
+        parser.push(String(amount));
+      },
+      transformReply(reply) {
+        return reply;
+      },
+    }),
+  },
+});
 client.on("error", (err) => console.error("Redis Client Error", err));
 
 export async function init() {
@@ -82,6 +109,12 @@ export async function setAccountBalance(id, balance) {
 
 export async function incrementAccountBalance(id, delta) {
   await client.hIncrByFloat(`account:${id}`, "balance", delta);
+}
+
+// returns true if the amount could be deducted from the account balance
+export async function reserveBalance(id, amount) {
+  const reserved = await client.reserveBalance(`account:${id}`, amount);
+  return reserved === 1;
 }
 
 async function hydrateAccount(id) {
