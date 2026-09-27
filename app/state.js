@@ -15,11 +15,11 @@ const LOG_KEY = "log";
 
 const redisUrl = process.env.REDIS_URL || "redis://redis:6379";
 // Atomically checks that the account has enough balance and, if so, deducts it.
-// Returns 1 if the amount was reserved, 0 otherwise.
+// Returns 1 if the amount was reserved, 0 otherwise (including invalid or non-positive amounts).
 const RESERVE_BALANCE_SCRIPT = `
 local balance = tonumber(redis.call("HGET", KEYS[1], "balance"))
 local amount = tonumber(ARGV[1])
-if balance == nil or balance < amount then
+if balance == nil or amount == nil or amount ~= amount or amount <= 0 or balance < amount then
   return 0
 end
 redis.call("HINCRBYFLOAT", KEYS[1], "balance", -amount)
