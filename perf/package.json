@@ -11,7 +11,9 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "artillery": "2.0.22",
+    "artillery": "2.0.22"
+  },
+  "devDependencies": {
     "artillery-plugin-statsd": "^2.2.1"
   }
 }
