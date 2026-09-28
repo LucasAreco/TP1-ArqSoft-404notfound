@@ -36,7 +36,7 @@ config:
       rampTo: 2
 
 scenarios:
-  - name: Caso de uso usuario (Rates -> Exchange -> Log)"
+  - name: Caso de uso usuario (Rates -> Exchange -> Rates)"
     flow:
       - get:
           url: "/rates"
@@ -49,6 +49,5 @@ scenarios:
             baseAccountId: "1"
             counterAccountId: "2"
             baseAmount: 1
-
       - get:
-          url: "/log"
+          url: "/rates"

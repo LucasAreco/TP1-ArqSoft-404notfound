@@ -26,17 +26,16 @@ config:
     - name: Ramp to breaking point
       duration: 180
       arrivalRate: 30
-      rampTo: 200
+      rampTo: 300
     - name: Peak sustain
       duration: 120
-      arrivalRate: 200
+      arrivalRate: 300
 
 scenarios:
-  - name: Caso de uso usuario (Rates -> Exchange -> Log)"
+  - name: Caso de uso usuario (Rates -> Exchange -> Rates)"
     flow:
       - get:
           url: "/rates"
-
       - post:
           url: "/exchange"
           json:
@@ -45,6 +44,5 @@ scenarios:
             baseAccountId: "1"
             counterAccountId: "2"
             baseAmount: 1
-
       - get:
-          url: "/log"
+          url: "/rates"
