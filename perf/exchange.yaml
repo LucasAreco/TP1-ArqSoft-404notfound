@@ -15,12 +15,12 @@ config:
 
   phases:
     - name: Ramp
-      duration: 30
-      arrivalRate: 5
-      rampTo: 20
+      duration: 60
+      arrivalRate: 100
+      rampTo: 300
     - name: Plain
-      duration: 180
-      arrivalRate: 20
+      duration: 660
+      arrivalRate: 300
 
 
 scenarios:
@@ -33,4 +33,4 @@ scenarios:
             counterCurrency: 'EUR'
             baseAccountId: 2018
             counterAccountId: 2011
-            baseAmount: 100
+            baseAmount: 10

@@ -63,7 +63,6 @@ async function save(data, fileName) {
 
 function scheduleSave(data, fileName, period) {
   setInterval(async () => {
-    console.log(data)
     await save(data, fileName);
   }, period);
 }
