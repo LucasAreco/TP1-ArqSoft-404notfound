@@ -1,7 +1,6 @@
 services:
     api:
       build: ./app
-      restart: unless-stopped
 
     nginx:
         image: nginx:1.29.8
@@ -12,7 +11,6 @@ services:
             - ./store/static/files:/static:ro
         links:
             - api
-        restart: unless-stopped
 
     graphite:
         image: graphiteapp/graphite-statsd:1.1.10-5
