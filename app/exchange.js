@@ -4,6 +4,39 @@ import * as state from "./state.js";
 //call to initialize the exchange service
 export async function init() {
   await state.init();
+
+  await normalizeRates();
+  await checkRatesConsistency();
+}
+
+// completa/corrige las tasas reciprocas a partir de las tasas directas >= 1
+async function normalizeRates() {
+  const rates = await state.getRates();
+  for (const base of Object.keys(rates)) {
+    for (const counter of Object.keys(rates[base])) {
+      const direct = rates[base][counter];
+
+      if (direct >= 1) {
+        await state.setRate(base, counter, direct);
+      }
+    }
+  }
+}
+
+function logInconsistentRates(rates) {
+  for (const base of Object.keys(rates)) {
+    for (const counter of Object.keys(rates[base])) {
+      const back = rates[counter]?.[base];
+      const roundTrip = back === undefined ? NaN : rates[base][counter] * back;
+      if (!(Math.abs(roundTrip - 1) < 1e-9)) {
+        console.error(`Tasa inconsistente ${base}->${counter}->${base}: ida y vuelta = ${roundTrip}`);
+      }
+    }
+  }
+}
+
+async function checkRatesConsistency() {
+  logInconsistentRates(await state.getRates());
 }
 
 //returns all internal accounts

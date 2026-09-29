@@ -156,7 +156,7 @@ export async function getRate(baseCurrency, counterCurrency) {
 }
 
 export async function setRate(baseCurrency, counterCurrency, rate) {
-  const reciprocal = Number((1 / rate).toFixed(5));
+  const reciprocal = 1 / rate;
 
   await client.hSet(`rates:${baseCurrency}`, { [counterCurrency]: rate });
   await client.hSet(`rates:${counterCurrency}`, { [baseCurrency]: reciprocal });

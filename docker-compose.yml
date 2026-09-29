@@ -5,6 +5,7 @@ services:
             - redis
       environment:
             - REDIS_URL=redis://redis:6379
+      restart: unless-stopped
 
     redis:
         image: redis:7
@@ -20,6 +21,7 @@ services:
             - ./store/static/files:/static:ro
         links:
             - api
+        restart: unless-stopped
 
     graphite:
         image: graphiteapp/graphite-statsd:1.1.10-5
