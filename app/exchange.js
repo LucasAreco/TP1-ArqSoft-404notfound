@@ -19,7 +19,7 @@ export async function init() {
 }
 
 function normalizeRates() {
-  for (constbase of Object.keys(rates)) {
+  for (const base of Object.keys(rates)) {
     for (const counter of Object.keys(rates[base])) {
       const direct = rates[base][counter];
 
@@ -72,7 +72,7 @@ export function setRate(rateRequest) {
   const { baseCurrency, counterCurrency, rate } = rateRequest;
 
   rates[baseCurrency][counterCurrency] = rate;
-  rates[counterCurrency][baseCurrency] = Number((1 / rate).toFixed(5));
+  rates[counterCurrency][baseCurrency] = 1 / rate;
 }
 
 //executes an exchange operation
