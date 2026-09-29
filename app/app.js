@@ -6,7 +6,7 @@ import {
   setAccountBalance,
   getRates,
   setRate,
-  getLog,
+  getLogPage,
   exchange,
 } from "./exchange.js";
 
@@ -57,8 +57,26 @@ app.put("/rates", (req, res) => {
 
 // LOG endpoint
 
-app.get("/log", (req, res) => {
-  res.json(getLog());
+app.get("/log", async (req, res) => {
+  let page = parseInt(req.query.page);
+  let limit = parseInt(req.query.limit);
+  
+  if (isNaN(page)){
+    page = 1;
+  }
+  
+  if (isNaN(limit)){
+    limit = 100;
+  }
+  
+  page = Math.max(page, 1)
+  limit = Math.min(limit, 100)
+  let logs = await getLogPage(page, limit);
+  res.status(200).json({
+    page,
+    limit,
+    data:logs
+  });
 });
 
 // EXCHANGE endpoint

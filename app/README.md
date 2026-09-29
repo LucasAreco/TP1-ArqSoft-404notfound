@@ -32,7 +32,7 @@ Tiene un objeto con las tasas de cambio. Ejemplo de una tasa:
         "USD": 0.00094
     }
 
-`log.json`
+`log.ndjson`
 
 Tiene un array con el log de transacciones del sistema. Ejemplo de una entrada de log:
 
@@ -56,7 +56,7 @@ Tiene un array con el log de transacciones del sistema. Ejemplo de una entrada d
 
 ### Tasas de cambio
 
-`GET /rates`
+`GET /rates/`
 
 Devuelve las tasas de cambio vigentes.
 
@@ -118,6 +118,13 @@ Todas las operaciones se registran en un log. Ver más abajo.
 `GET /logs`
 
 Devuelve el log de operaciones. Este log se persiste cada 5 segundos.
+    {
+        "page": 2,
+        "limit": 50
+    }
+Parametros de query:
+- `page`: Pagina del log a mostrar
+- `limit`: Cantidad de logs por pagina
 
 ## TODO
 

@@ -1,11 +1,9 @@
 import { nanoid } from "nanoid";
-import fs from "fs";
-import { init as stateInit, getAccounts as stateAccounts, getRates as stateRates, getLog as stateLog , saveLog} from "./state.js";
+import { init as stateInit, getAccounts as stateAccounts, getRates as stateRates, loadNewLog , getLogPage as stateLogPage} from "./state.js";
 
 
 let accounts;
 let rates;
-let log;
 
 //call to initialize the exchange service
 export async function init() {
@@ -13,18 +11,6 @@ export async function init() {
 
   accounts = stateAccounts();
   rates = stateRates();
-  log = [];
-
-  setInterval(async () => {
-    const buffer_log = log;
-    log = []
-    try{
-      await saveLog(buffer_log)
-    } catch (err){
-      console.error('Error al persistir logs en disco:', err);
-      throw new Error(err)
-    }
-  }, 1000)
 }
 
 //returns all internal accounts
@@ -47,8 +33,8 @@ export function getRates() {
 }
 
 //returns the whole transaction log
-export function getLog() {
-  return stateLog();
+export async function getLogPage(page, limit) {
+  return await stateLogPage(page, limit);
 }
 
 //sets the exchange rate for a given pair of currencies, and the reciprocal rate as well
@@ -117,8 +103,7 @@ export async function exchange(exchangeRequest) {
   }
 
   //log the transaction and return it
-  log.push(exchangeResult);
-
+  loadNewLog(exchangeResult);
   return exchangeResult;
 }
 
