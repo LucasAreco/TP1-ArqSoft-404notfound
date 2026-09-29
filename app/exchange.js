@@ -1,5 +1,4 @@
 import { nanoid } from "nanoid";
-
 import * as state from "./state.js";
 
 //call to initialize the exchange service
@@ -23,8 +22,8 @@ export async function getRates() {
 }
 
 //returns the whole transaction log
-export async function getLog() {
-  return state.getLog();
+export async function getLogPage(page, limit) {
+  return await state.getLogPage(page, limit);
 }
 
 //sets the exchange rate for a given pair of currencies, and the reciprocal rate as well

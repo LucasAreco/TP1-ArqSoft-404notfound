@@ -1,11 +1,13 @@
 import { fileURLToPath } from "url";
 import path from "path";
 import fs from "fs";
+import readline from 'readline';
 import { createClient, defineScript } from "redis";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+const LOG = "./state/log.ndjson";
 const SEED_ACCOUNTS = "./state/accounts.json";
 const SEED_RATES = "./state/rates.json";
 
@@ -47,6 +49,7 @@ client.on("error", (err) => console.error("Redis Client Error", err));
 export async function init() {
   await client.connect();
   await seedIfEmpty();
+  scheduleLogSave(1000);
 }
 
 async function seedIfEmpty() {
@@ -162,11 +165,83 @@ export async function setRate(baseCurrency, counterCurrency, rate) {
 
 // LOG
 
-export async function getLog() {
-  const entries = await client.lRange(LOG_KEY, 0, -1);
-  return entries.map((entry) => JSON.parse(entry));
-}
-
 export async function appendLog(entry) {
   await client.rPush(LOG_KEY, JSON.stringify(entry));
+}
+
+export async function saveLog(log){
+  if (!log || log.length === 0){
+    return;
+  }
+
+  const logString = log.join('\n') + '\n';
+  const filePath = path.join(__dirname, LOG);
+  await fs.promises.appendFile(filePath, logString);
+}
+
+async function scheduleLogSave(period){
+  setInterval(async () => {
+    try{
+      const entries = await client.lRange(LOG_KEY, 0, -1)
+      await saveLog(entries)
+      await client.lTrim(LOG_KEY, entries.length, -1)
+    } catch (err){
+      console.error('Error al persistir logs en disco:', err);
+      throw new Error(err)
+    }
+  }, period)
+}
+
+export async function getLogPage(page, limit){
+  const filePath = path.join(__dirname, LOG);
+  const results = []
+  let file = null
+  let buffReader = null
+  try {
+    await fs.promises.access(filePath);
+    file = fs.createReadStream(filePath, {encoding: "utf8"});
+    buffReader = readline.createInterface({
+      input: file,
+      crlfDelay: Infinity
+    })
+
+    const startRow = (page - 1) * limit;
+    const endRow = startRow + limit;
+    let rowIdx = 0;
+
+    for await (const line of buffReader){
+      const trimmedLine = line.trim();
+
+      if (trimmedLine && rowIdx >= startRow && rowIdx < endRow){
+        try{
+          results.push(JSON.parse(trimmedLine));
+        } catch (err){
+          console.error(`Error reading line ${rowIdx}. Error:`, err)
+        }
+      }
+      
+      rowIdx ++;
+      if (rowIdx >= endRow){
+        break
+      }
+    }
+
+  }catch (err) {
+    if (err.code == "ENOENT") {
+      console.error(`${filePath} not found`);
+    } else {
+      console.error(`Error reading ${filePath}:`, err);
+    }
+
+  } finally{
+    if (buffReader){
+      buffReader.close();
+    }
+
+    if (file){
+      file.destroy();
+    }
+
+    return results;
+  }
 }
