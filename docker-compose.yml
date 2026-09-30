@@ -1,6 +1,8 @@
 services:
     api:
       build: ./app
+      deploy:
+            replicas: 3
       depends_on:
             - redis
       environment:
