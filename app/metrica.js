@@ -50,8 +50,8 @@ export async function addBuyingMovement(currency, bought_ammount){
   }
 
   await client.multi()
-    .hIncrBy(`metrics:${currency}`, 'volume', bought_ammount)
-    .hIncrBy(`metrics:${currency}`, 'net', bought_ammount)
+    .hIncrByFloat(`metrics:${currency}`, 'volume', bought_ammount)
+    .hIncrByFloat(`metrics:${currency}`, 'net', bought_ammount)
     .exec();
 }
 
@@ -65,12 +65,18 @@ export async function addSellingMovement(currency, sold_ammount){
   }
 
   await client.multi()
-    .hIncrBy(`metrics:${currency}`, 'volume', sold_ammount)
-    .hIncrBy(`metrics:${currency}`, 'net', -sold_ammount)
+    .hIncrByFloat(`metrics:${currency}`, 'volume', sold_ammount)
+    .hIncrByFloat(`metrics:${currency}`, 'net', -sold_ammount)
     .exec();
 }
 
+function sendAllMetricsSafely() {
+  sendAllMetrics().catch((error) => {
+    console.error('Error sending metrics:', error.message);
+  });
+}
+
 export function startMetricsInterval() {
-  sendAllMetrics();
-  setInterval(sendAllMetrics, 3000);
+  sendAllMetricsSafely();
+  setInterval(sendAllMetricsSafely, 3000);
 }
