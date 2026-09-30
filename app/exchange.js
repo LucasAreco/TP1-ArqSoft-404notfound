@@ -1,12 +1,13 @@
 import { nanoid } from "nanoid";
 import * as state from "./state.js";
+import {startMetricsInterval} from "./metrica.js"
 
 //call to initialize the exchange service
 export async function init() {
   await state.init();
-
   await normalizeRates();
   await checkRatesConsistency();
+  startMetricsInterval()
 }
 
 // completa/corrige las tasas reciprocas a partir de las tasas directas >= 1

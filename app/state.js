@@ -12,7 +12,7 @@ const SEED_ACCOUNTS = "./state/accounts.json";
 const SEED_RATES = "./state/rates.json";
 
 const ACCOUNT_IDS_KEY = "accounts:ids";
-const RATE_CURRENCIES_KEY = "rates:currencies";
+export const RATE_CURRENCIES_KEY = "rates:currencies";
 const LOG_KEY = "log";
 
 const redisUrl = process.env.REDIS_URL || "redis://redis:6379";
@@ -28,7 +28,7 @@ redis.call("HINCRBYFLOAT", KEYS[1], "balance", -amount)
 return 1
 `;
 
-const client = createClient({
+export const client = createClient({
   url: redisUrl,
   scripts: {
     reserveBalance: defineScript({

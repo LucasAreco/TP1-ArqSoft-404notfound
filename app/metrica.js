@@ -1,26 +1,36 @@
 import dgram from "dgram";
+import {client, RATE_CURRENCIES_KEY} from "./state.js"
 
 // We send the metrics to graphite
 const clienteStatsD = dgram.createSocket('udp4');
 const statsd_host = 'graphite'; 
 const statsd_port = 8125;
 
-// currency: [volume, net value]
-const currency_metrics = new Map([
-    ["ARS", [0, 0]],
-    ["BRL", [0, 0]],
-    ["EUR", [0, 0]],
-    ["USD", [0, 0]],
-]);
 
-function sendAllMetrics() {
+async function sendAllMetrics() {
   const metricsArray = [];
+  const currencies = await client.sMembers(RATE_CURRENCIES_KEY);
 
-  for (const [currency, metrics] of currency_metrics) {
-    metricsArray.push(`currency.${currency}.volume:${metrics[0]}|g`);
-    metricsArray.push(`currency.${currency}.net:${metrics[1]}|g`);
+  for (const currency of currencies) {
+    const data = await client.hGetAll(`metrics:${currency}`)
+    let volume = 0;
+    let net = 0;
+
+    if (data.volume !== undefined){
+      volume = data.volume;
+    }
+
+    if (data.net !== undefined){
+      net = data.net;
+    }
+    
+    if (net < 0) {
+      metricsArray.push(`currency.${currency}.net:0|g`);
+    }
+    metricsArray.push(`currency.${currency}.net:${net}|g`);
+    metricsArray.push(`currency.${currency}.volume:${volume}|g`);
   }
-
+  
   const payload = Buffer.from(metricsArray.join('\n'));
 
   clienteStatsD.send(payload, 0, payload.length, statsd_port, statsd_host, (error) => {
@@ -31,34 +41,36 @@ function sendAllMetrics() {
 }
 
 // Increases volume and net value
-export function addBuyingMovement(currency, bought_ammount){
-    if (!currency_metrics.has(currency)){
-        console.error('Invalid currency');
-        return;
-    }
+export async function addBuyingMovement(currency, bought_ammount){
+  const currencies = await client.sMembers(RATE_CURRENCIES_KEY);
 
-    let metrics = currency_metrics.get(currency);
-    metrics[0] += bought_ammount;
-    metrics[1] += bought_ammount;
-    currency_metrics.set(currency, metrics);
+  if (!currencies.includes(currency)){
+    console.error('Invalid currency');
+    return;
+  }
 
-    sendAllMetrics(currency, metrics);
+  await client.multi()
+    .hIncrBy(`metrics:${currency}`, 'volume', bought_ammount)
+    .hIncrBy(`metrics:${currency}`, 'net', bought_ammount)
+    .exec();
 }
 
 // Increases volume, but decresses net value
-export function addSellingMovement(currency, sold_ammount){
-    if (!currency_metrics.has(currency)){
-        console.error('Invalid currency');
-        return;
-    }
+export async function addSellingMovement(currency, sold_ammount){
+  const currencies = await client.sMembers(RATE_CURRENCIES_KEY);
 
-    let metrics = currency_metrics.get(currency);
-    metrics[0] += sold_ammount;
-    metrics[1] -= sold_ammount;
-    currency_metrics.set(currency, metrics);
-    
-    sendAllMetrics();
+  if (!currencies.includes(currency)){
+    console.error('Invalid currency');
+    return;
+  }
+
+  await client.multi()
+    .hIncrBy(`metrics:${currency}`, 'volume', sold_ammount)
+    .hIncrBy(`metrics:${currency}`, 'net', -sold_ammount)
+    .exec();
 }
 
-sendAllMetrics()
-const interval = setInterval(sendAllMetrics, 3000);
+export function startMetricsInterval() {
+  sendAllMetrics();
+  setInterval(sendAllMetrics, 3000);
+}
